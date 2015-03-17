@@ -5,7 +5,8 @@
 --             (last . snd . fst $ myPair s, s ++ [2]))
 
 -- State monad
-type Stack = [Int]
+type E = Int
+type Stack = [E]
 type MS a = Stack -> (a, Stack)
 
 unitS ::  a -> MS a
@@ -16,8 +17,8 @@ bindS m k s = k a s'
   where (a, s') = m s
 
 -- WriterT State monad
--- "underlying" monoid : <{True, False}, &&, True>
-type M a = Stack -> ((a, Bool), Stack)
+-- Monoid : <{T, F}, &&, T>
+type M a = MS (a, Bool)
 
 unit ::  a -> M a
 unit a = unitS (a, True)
@@ -29,8 +30,7 @@ bind m k =
       unitS (b, w && nw)
 
 lift ::  MS a -> M a
-lift m s = ((a, True), s')
-  where (a, s') = m s
+lift m = m `bindS` unit   -- ergo, dispensable
 
 -- Applicative functors
 rapply ::  M (a -> b) -> M a -> M b
@@ -45,39 +45,39 @@ lapply m n =
     n `bind` \f ->
       unit $ f x
 
--- Ticks
-tick ::  MS Int -> MS Int
-tick m =
-  m `bindS` \x -> \s ->
-    unitS x $ s ++ [x]
+-- Tick and pro
+tickK ::  E -> MS E
+tickK x s = unitS x $ s ++ [x]
+
+tick ::  MS E -> MS E
+tick m = m `bindS` tickK   -- can be dispensed with.. but
+                           -- kept around for convenience
+
+pro ::  MS E
+pro s = unitS (last s) s
 
 -- Comma
-comma ::  M Bool -> M (a -> a)
-comma m =
-  m `bind` \a -> \s ->
-    ((\x -> x, a), s)
+comma ::  (E -> MS Bool) -> (E -> M E)
+comma k x =
+  k x `bindS` \w ->
+     unitS (x, w)
 
 -- Sanity check
 extract ::  Show a => M a -> String
 extract m = show $ m []
 
-eq0 ::  M (Int -> Bool)
-eq0 = lift $ \s -> (\x -> x == last s, s)
+k0 ::  E -> M E
+k0 = comma $ unitS . even  -- NRC "which is even"
 
-testCase ::  M Bool
-testCase =
-  ((lift . tick $ unitS 2)
-    `lapply`
-      (comma . lift $ \s -> (last s == 3, s)))
-  `lapply`
-  eq0
+test ::  M E
+test = (tick $ unitS 2) `bindS` k0  -- "2, which is even"
 
 main ::  IO ()
 main = do
-  putStrLn . extract $ testCase
+  putStrLn . extract $ test
 
--- to consider
--- nested ARCs
--- nominal appositives
--- quantifiers and how appositives attach
--- how many of these combinators are really necessary
+-- TODO:
+-- test nested ARCs
+-- test quantifiers and how appositives attach
+-- treat nominal appositives
+-- figure out which combinators necessary
