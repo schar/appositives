@@ -67,14 +67,21 @@ extract ::  Show a => M a -> String
 extract m = show $ m []
 
 k0 ::  E -> M E
-k0 = comma $ unitS . even  -- NRC "which is even"
+k0 = comma $ unitS . even  -- which is even [NRC]
 
-test ::  M E
-test = (tick $ unitS 2) `bindS` k0  -- "2, which is even"
+subj ::  M E
+subj = (tick $ unitS 3) `bindS` k0  -- 3, which is even
+
+sent :: M Bool
+sent =
+  subj `lapply`
+    (unit (==) `rapply` lift pro)   -- 3, which is even, equals itself
+                                    -- mainly True, False on the side,
+                                    -- binding succeeds!
 
 main ::  IO ()
 main = do
-  putStrLn . extract $ test
+  putStrLn . extract $ sent
 
 -- TODO:
 -- test nested ARCs
