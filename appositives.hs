@@ -16,16 +16,17 @@ bindS m k s = k a s'
   where (a, s') = m s
 
 -- WriterT State monad
+-- "underlying" monoid : <{True, False}, &&, True>
 type M a = Stack -> ((a, Bool), Stack)
 
 unit ::  a -> M a
 unit a = unitS (a, True)
 
 bind ::  M a -> (a -> M b) -> M b
-bind m k s = ((b, p && q), s'')
-  where
-    ((a, p), s' ) = m s
-    ((b, q), s'') = k a s'  -- should generalize
+bind m k =
+  m `bindS` \(a, w) ->
+    k a `bindS` \(b, nw) ->
+      unitS (b, w && nw)
 
 lift ::  MS a -> M a
 lift m s = ((a, True), s')
@@ -48,27 +49,13 @@ lapply m n =
 tick ::  MS Int -> MS Int
 tick m =
   m `bindS` \x -> \s ->
-    unitS x $ s ++ [x]  -- should maybe just be defined
-                        -- in terms of State monad
+    unitS x $ s ++ [x]
 
 -- Comma
 comma ::  M Bool -> M (a -> a)
 comma m =
   m `bind` \a -> \s ->
     ((\x -> x, a), s)
-
--- Lexicon
-eq ::  Eq a => a -> a -> Bool
-eq = (==)
-
-gt ::  Ord a => a -> a -> Bool
-gt = (>)
-
-lt ::  Ord a => a -> a -> Bool
-lt = (<)
-
-neg ::  MS (Bool -> Bool)
-neg = unitS not
 
 -- Sanity check
 extract ::  Show a => M a -> String
@@ -88,3 +75,9 @@ testCase =
 main ::  IO ()
 main = do
   putStrLn . extract $ testCase
+
+-- to consider
+-- nested ARCs
+-- nominal appositives
+-- quantifiers and how appositives attach
+-- how many of these combinators are really necessary
