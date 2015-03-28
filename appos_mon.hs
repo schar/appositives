@@ -59,5 +59,17 @@ instance Monad m => Applicative (WriterT m) where
   pure  = return
   (<*>) = ap
 
+tick :: Monad m => StateT m E -> StateT m E
+tick m = do { x <- m; StateT $ \s -> runStateT (return x) (s++[x]) }
+
+inj :: Int -> WriterT (StateT List) Int
+inj x = lift . tick $ return x
+
+display :: WriterT (StateT List) a -> [((a, Bool), S)]
+display (WriterT (StateT f)) = runList $ f []
+
+add :: WriterT (StateT List) Int
+add = return (+) <*> inj 3 <*> inj 2
+
 main :: IO ()
-main = putStrLn "heyyy"
+main = print . display $ add
