@@ -135,6 +135,7 @@ neg (StateT p) = StateT $ \s -> m s
 --
 -- binding into and out of NRC
 -- an odd, which is less than its successor, is less than it
+--
 check :: TP
 check = return (<) <*> anOddWhichLTSucc <*> lift (pro 0)
 
@@ -143,19 +144,35 @@ check = return (<) <*> anOddWhichLTSucc <*> lift (pro 0)
 -- directly with anything that has supplemental content
 -- instead, the latter must scope over the negation,
 -- which allows us to form a P, which is then lifted into
--- the "outer" monad, like so:
+-- the "outer" monad, like so...
+--
 try :: TP
 try = do -- an odd, which is less than its succ, isn't odd
   x <- anOddWhichLTSucc -- see below for definition
   p <- lift . neg . return $ odd x
   return p
 
+-- text sequencing, just monadized boolean conjunction
+--
+text1, text2 :: TP
+text1 = return (&&) <*> check <*> lift (do { x <- pro 0; return $ odd x })
+text2 = return (&&) <*> check <*> lift (do { x <- pro 1; return $ odd x })
+
+-- stacked appositives
+-- three, which l.t. its successor, which g.t. it, is odd
+stacked :: TP
+stacked = do
+  x <- lift . push . return $ 3
+  y <- comma rcLTSucc x
+  z <- comma (\u -> do {v <- pro 0; return $ (<) u v }) y
+  return $ odd z -- something i do not quite understand
+                 -- is happening here with the order of
+                 -- drefs, but broadly the anaphora and
+                 -- stacking all works out... o_o
+
 display :: WriterT (StateT List) a -> [((a, T), S)]
 display (WriterT (StateT f)) = runList $ f []
 
 main :: IO ()
-main = do
-  print . display $ check
-  putStrLn ""
-  print . display $ try
-  --(writeFile "x.txt" . show . display) check
+main = putStrLn "DO STHG"
+--(writeFile "x.txt" . show . display) check
