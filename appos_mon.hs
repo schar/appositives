@@ -138,7 +138,6 @@ neg (StateT p) = StateT $ \s -> m s
 --
 -- binding into and out of NRC
 -- an odd, which is less than its successor, is less than it
---
 check :: TP
 check = return (<) <*> anOddWhichLTSucc <*> lift (pro 0)
 
@@ -148,8 +147,10 @@ check = return (<) <*> anOddWhichLTSucc <*> lift (pro 0)
 -- instead, the latter must scope over the negation,
 -- which allows us to form a P, which is then lifted into
 -- the "outer" monad, like so...
+--
+-- an odd, which is less than its succ, isn't odd
 try :: TP
-try = do -- an odd, which is less than its succ, isn't odd
+try = do
   x <- anOddWhichLTSucc
   p <- lift . neg . return $ odd x
   return p
@@ -173,7 +174,13 @@ stacked2 = do
   y <- lift . push $ return succ <*> pro 0                 -- 3's succ [+ dref]
   z <- comma (\u -> do { v <- pro 1; return $ (>) u v }) y -- 3's succ, which > 3
   u <- comma (\v -> return $ (<) v z) x                    -- 3, which < its succ
-  return $ odd u
+  return $ odd u -- perhaps cleaner to separate the
+                 -- 1D-to-2D piping step from the
+                 -- toggling between the two monads..
+                 -- that way, can assume that piping
+                 -- always operates on functions into
+                 -- WriterT, avoid odd scopings like
+                 -- those in evidence in stacked2
 
 display :: WriterT (StateT List) a -> [((a, T), S)]
 display (WriterT (StateT f)) = runList $ f []
