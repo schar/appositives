@@ -95,11 +95,15 @@ comma f x = WriterT $ do
 --                  x <- inj 3
 --                  comma rcOdd x
 
-rcLTSucc :: E -> P
+rcLTSucc,rcGTSucc :: E -> P
 rcLTSucc x = do
              y <- pro 0
              z <- push . return $ succ y
              return $ (<) x z
+rcGTSucc x = do
+             y <- pro 0
+             z <- push . return $ succ y
+             return $ (>) x z
 
 --threeWhichLTSucc :: EP
 --threeWhichLTSucc = do
@@ -130,7 +134,6 @@ neg (StateT p) = StateT $ \s -> m s
           [] -> List [(True , s)]
           _  -> List [(False, s)]
 
-
 -- testing
 --
 -- binding into and out of NRC
@@ -141,34 +144,36 @@ check = return (<) <*> anOddWhichLTSucc <*> lift (pro 0)
 
 -- negation is defined in the "lexical"[?] monad (StateT
 -- List). its type does not, it follows, let it combine
--- directly with anything that has supplemental content
+-- directly with anything that has supplemental content.
 -- instead, the latter must scope over the negation,
 -- which allows us to form a P, which is then lifted into
 -- the "outer" monad, like so...
---
 try :: TP
 try = do -- an odd, which is less than its succ, isn't odd
-  x <- anOddWhichLTSucc -- see below for definition
+  x <- anOddWhichLTSucc
   p <- lift . neg . return $ odd x
   return p
 
 -- text sequencing, just monadized boolean conjunction
---
 text1, text2 :: TP
 text1 = return (&&) <*> check <*> lift (do { x <- pro 0; return $ odd x })
 text2 = return (&&) <*> check <*> lift (do { x <- pro 1; return $ odd x })
 
 -- stacked appositives
--- three, which l.t. its successor, which g.t. it, is odd
-stacked :: TP
-stacked = do
+-- [three, which l.t. its successor], which l.t. it, is odd
+stacked1,stacked2 :: TP
+stacked1 = do
   x <- lift . push . return $ 3
   y <- comma rcLTSucc x
   z <- comma (\u -> do {v <- pro 0; return $ (<) u v }) y
-  return $ odd z -- something i do not quite understand
-                 -- is happening here with the order of
-                 -- drefs, but broadly the anaphora and
-                 -- stacking all works out... o_o
+  return $ odd z
+-- three, which l.t. [its successor, which g.t. it], is odd
+stacked2 = do
+  x <- lift . push . return $ 3                            -- 3 [+ dref]
+  y <- lift . push $ return succ <*> pro 0                 -- 3's succ [+ dref]
+  z <- comma (\u -> do { v <- pro 1; return $ (>) u v }) y -- 3's succ, which > 3
+  u <- comma (\v -> return $ (<) v z) x                    -- 3, which < its succ
+  return $ odd u
 
 display :: WriterT (StateT List) a -> [((a, T), S)]
 display (WriterT (StateT f)) = runList $ f []
