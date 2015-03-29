@@ -131,25 +131,24 @@ neg (StateT p) = StateT $ \s -> m s
           _  -> List [(False, s)]
 
 
+-- testing
+--
+-- binding into and out of NRC
+-- an odd, which is less than its successor, is less than it
+check :: TP
+check = return (<) <*> anOddWhichLTSucc <*> lift (pro 0)
+
 -- negation is defined in the "lexical"[?] monad (StateT
 -- List). its type does not, it follows, let it combine
 -- directly with anything that has supplemental content
 -- instead, the latter must scope over the negation,
 -- which allows us to form a P, which is then lifted into
 -- the "outer" monad, like so:
-
 try :: TP
 try = do -- an odd, which is less than its succ, isn't odd
   x <- anOddWhichLTSucc -- see below for definition
-  p  <- lift . neg . return $ odd x
+  p <- lift . neg . return $ odd x
   return p
-
--- testing
---
--- binding into and out of NRC
--- an odd, which is less than its successor, is less than it
-check :: WriterT (StateT List) T
-check = return (<) <*> anOddWhichLTSucc <*> lift (pro 0)
 
 display :: WriterT (StateT List) a -> [((a, T), S)]
 display (WriterT (StateT f)) = runList $ f []
