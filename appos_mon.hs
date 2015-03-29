@@ -1,6 +1,7 @@
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Trans
+--import           System.Environment
 
 data List a = List { runList :: [a] }
 
@@ -16,6 +17,7 @@ instance Applicative List where
   (<*>) = ap
 
 type E = Int
+type T = Bool
 type S = [E]
 
 data StateT m a = StateT { runStateT :: S -> m (a, S)}
@@ -40,7 +42,7 @@ instance Monad m => Applicative (StateT m) where
   pure  = return
   (<*>) = ap
 
-data WriterT m a = WriterT { runWriterT :: m (a, Bool) }
+data WriterT m a = WriterT { runWriterT :: m (a, T) }
 
 instance Monad m  => Monad (WriterT m) where
   return x        = WriterT . return $ (x, True)
@@ -76,8 +78,9 @@ pro n = StateT $ \s -> return (reverse s !! n, s)
 --inj x = lift . push $ return x
 
 -- NRCs
-type P  = StateT List Bool
+type P  = StateT List T
 type EP = WriterT (StateT List) E
+type TP = WriterT (StateT List) T
 
 comma :: (E -> P) -> E -> EP
 comma f x = WriterT $ do
@@ -106,25 +109,54 @@ rcLTSucc x = do
 -- indefinites
 
 domain :: S
-domain = [1..5]
+domain = [1..10]
 
-indef :: (E -> Bool) -> StateT List E
-indef prop = StateT $ \s -> List . concat $ map (\x -> [(x, s)]) $ filter prop domain
+indef :: (E -> T) -> StateT List E
+indef prop = StateT $ \s ->
+  List . concat $
+    map (\x -> [(x, s)]) $
+      filter prop domain
 
 anOddWhichLTSucc :: EP
 anOddWhichLTSucc = do
-                   x <- lift . push $ indef odd
+                   x <- (lift . push . indef) odd
                    comma rcLTSucc x
+
+-- negation
+neg :: P -> P
+neg (StateT p) = StateT $ \s -> m s
+  where filt s = filter (\(a, _) -> a) $ runList (p s)
+        m s    = case (filt s) of
+          [] -> List [(True , s)]
+          _  -> List [(False, s)]
+
+
+-- negation is defined in the "lexical"[?] monad (StateT
+-- List). its type does not, it follows, let it combine
+-- directly with anything that has supplemental content
+-- instead, the latter must scope over the negation,
+-- which allows us to form a P, which is then lifted into
+-- the "outer" monad, like so:
+
+try :: TP
+try = do -- an odd, which is less than its succ, isn't odd
+  x <- anOddWhichLTSucc -- see below for definition
+  p  <- lift . neg . return $ odd x
+  return p
 
 -- testing
 --
 -- binding into and out of NRC
--- 3, which is less than its successor, is less than it
-check :: WriterT (StateT List) Bool
+-- an odd, which is less than its successor, is less than it
+check :: WriterT (StateT List) T
 check = return (<) <*> anOddWhichLTSucc <*> lift (pro 0)
 
-display :: WriterT (StateT List) a -> [((a, Bool), S)]
+display :: WriterT (StateT List) a -> [((a, T), S)]
 display (WriterT (StateT f)) = runList $ f []
 
 main :: IO ()
-main = print . display $ check
+main = do
+  print . display $ check
+  putStrLn ""
+  print . display $ try
+  --(writeFile "x.txt" . show . display) check
