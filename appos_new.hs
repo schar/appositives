@@ -15,17 +15,17 @@ instance Monoid Bool where
   mempty  = True
   mappend = (&&)
 
--- anaphora: push/pro/abstraction
-push :: Monad m => ST m E -> ST m E
+-- anaphora: push, λ, pro
+push :: MonadState S m => m E -> m E
 push m = do
          x <- m
-         StateT $ \s -> runStateT (return x) (s++[x])
-
-pro :: MonadState S m => Int -> m E
-pro n = gets $ (!!n) . reverse
+         modify (++[x]) >> return x
 
 lambda :: MonadState S m => m a -> E -> m a
 lambda m x = modify (++[x]) >> m
+
+pro :: MonadState S m => Int -> m E
+pro n = gets $ (!!n) . reverse
 
 -- NRCs
 type P  = ST [] T
@@ -73,6 +73,10 @@ neg (StateT p) = StateT $ \s -> m s
 -- an odd, which is less than its successor, is less than it
 check :: TP
 check = return (<) <*> anOddWhichLTSucc <*> lift (pro 0)
+-- an even[x] is l.t. 8, which is g.t. its[x] successor
+cheque :: TP
+cheque = return (<) <*> (lift . push . indef) even <*> obj
+  where obj = do { x <- return 8; push $ comma rcGTSucc x }
 
 -- negation is defined in the "lexical"[?] monad (StateT
 -- List). its type does not, it follows, let it combine
@@ -116,6 +120,25 @@ stacked2 = do
 
 display :: WriterT T (StateT S []) a -> [((a, T), S)]
 display (WriterT (StateT f)) = f []
+
+-- disjunction facts: can supplement a
+-- disjunction, but cannot directly disjoin
+-- supplemented things (the effect is to give
+-- each of the supplements scope over the
+-- disjunction). happily, this just follows
+-- from the type theory. other accounts?
+disj :: ST [] a -> ST [] a -> ST [] a
+disj = mplus
+
+-- as noted, it *is* possible for a disjunction
+-- (though not a disjunct) to be supplemented:
+twoOrThree :: ST [] E
+twoOrThree = push $ return 2 `disj` return 3
+
+-- two or three, which is odd
+twoOrThreeWhichOdd :: EP
+twoOrThreeWhichOdd = do { x <- lift twoOrThree; comma rel x }
+  where rel x = return $ odd x
 
 main :: IO ()
 main = putStrLn "DO STHG"
