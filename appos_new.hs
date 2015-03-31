@@ -21,11 +21,11 @@ push m = do
          x <- m
          StateT $ \s -> runStateT (return x) (s++[x])
 
-pro :: Monad m => Int -> ST m E
-pro n = StateT $ \s -> return (reverse s !! n, s)
+pro :: MonadState S m => Int -> m E
+pro n = gets $ (!!n) . reverse
 
 lambda :: MonadState S m => m a -> E -> m a
-lambda m x = modify ((++) [x]) >> m
+lambda m x = modify (++[x]) >> m
 
 -- NRCs
 type P  = ST [] T
@@ -35,7 +35,7 @@ type TP = WriterT T (StateT S []) T
 comma :: (E -> P) -> E -> EP
 comma f x = WriterT $ do
                       p <- f x
-                      return (x, p)
+                      return (x, p) -- DB: = \f -> listen . lift . f?
 
 rcLTSucc,rcGTSucc :: E -> P
 rcLTSucc x = do
@@ -49,13 +49,10 @@ rcGTSucc x = do
 
 -- indefinites
 domain :: S
-domain = [1..1000]
+domain = [1..10]
 
 indef :: (E -> T) -> StateT S [] E
-indef prop = StateT $ \s ->
-  concat $
-    map (\x -> [(x, s)]) $
-      filter prop domain
+indef prop = mfilter prop $ lift domain
 
 anOddWhichLTSucc :: EP
 anOddWhichLTSucc = do
@@ -88,8 +85,7 @@ check = return (<) <*> anOddWhichLTSucc <*> lift (pro 0)
 try :: TP
 try = do
   x <- anOddWhichLTSucc
-  p <- lift . neg . return $ odd x
-  return p
+  lift . neg . return $ odd x
 
 -- text sequencing, just monadized boolean conjunction
 text1, text2 :: TP
