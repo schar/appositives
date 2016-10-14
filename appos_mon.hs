@@ -1,7 +1,6 @@
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Trans
---import           System.Environment
 
 data List a = List { runList :: [a] }
 
@@ -74,9 +73,6 @@ push m = do
 pro :: Monad m => Int -> StateT m E
 pro n = StateT $ \s -> return (reverse s !! n, s)
 
---inj :: E -> WriterT (StateT List) E
---inj x = lift . push $ return x
-
 -- NRCs
 type P  = StateT List T
 type EP = WriterT (StateT List) E
@@ -86,14 +82,6 @@ comma :: (E -> P) -> E -> EP
 comma f x = WriterT $ do
                       p <- f x
                       return (x, p)
-
---rcOdd :: E -> P
---rcOdd x = return $ odd x
-
---threeWhichIsOdd :: EP
---threeWhichIsOdd = do
---                  x <- inj 3
---                  comma rcOdd x
 
 rcLTSucc,rcGTSucc :: E -> P
 rcLTSucc x = do
@@ -105,15 +93,9 @@ rcGTSucc x = do
              z <- push . return $ succ y
              return $ (>) x z
 
---threeWhichLTSucc :: EP
---threeWhichLTSucc = do
---                   x <- inj 3
---                   comma rcLTSucc x
-
 -- indefinites
-
 domain :: S
-domain = [1..10]
+domain = [1..1000]
 
 indef :: (E -> T) -> StateT List E
 indef prop = StateT $ \s ->
@@ -187,4 +169,3 @@ display (WriterT (StateT f)) = runList $ f []
 
 main :: IO ()
 main = putStrLn "DO STHG"
---(writeFile "x.txt" . show . display) check
